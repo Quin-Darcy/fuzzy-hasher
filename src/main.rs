@@ -47,28 +47,32 @@ fn get_message_bytes(d_type: u32, data: &str) -> Result<Vec<u8>, std::io::Error>
 
 fn get_fuzzy_hash(bblocks: Vec<Vec<u8>>, msg_bytes: Vec<u8>) -> String {
     let mut hash: String = String::new();
-    for i in 0..msg_bytes.len()-BBLOCK_BYTE_LEN {
-        let mut current_dist = 0;
-        let mut min_index: usize = 0;
-        let mut min_d: u32 = 8 * BBLOCK_BYTE_LEN as u32;
-        let current_byte_block: Vec<u8> = (0..BBLOCK_BYTE_LEN).into_par_iter().map(|j| msg_bytes[i+j]).collect();
+    let msg_blocks: Vec<Vec<u8>> = (0..msg_bytes.len()-BBLOCK_BYTE_LEN-1)
+        .into_par_iter()
+        .map(|i| msg_bytes[i..i+BBLOCK_BYTE_LEN].to_vec())
+        .collect();
 
-        for j in 0..NUM_OF_BBLOCKS {
-            current_dist = hamming_dist(&current_byte_block, &bblocks[j]);
-            if current_dist < min_d {
-                min_d = current_dist;
-                min_index = j;
+        for block in msg_blocks {
+            let mut current_dist;
+            let mut min_index: usize = 0;
+            let mut min_d: u32 = 8 * BBLOCK_BYTE_LEN as u32;
+
+            for j in 0..NUM_OF_BBLOCKS {
+                current_dist = hamming_dist(&block, &bblocks[j]);
+                if current_dist < min_d {
+                    min_d = current_dist;
+                    min_index = j;
+                }
             }
-        }
-        if current_dist < HD_THRESHOLD as u32 {
-            hash.push_str(&format!("{:0x}", min_index)[..]);
-        }
-    }
+            if min_d < HD_THRESHOLD as u32 {
+                hash.push_str(&format!("{:0x}", min_index)[..]);
+            }
+
     hash
 }
 
 fn main() {
-    let path: &str = "/home/nimrafets/Documents/ecdsa2vs.pdf";
+    let path: &str = "/home/arbegla/Downloads/voronoi.png";
     let bblocks: Vec<Vec<u8>> = get_bblocks();
     let msg_bytes: Vec<u8> = get_message_bytes(102, path).unwrap();
     let hash1: String = get_fuzzy_hash(bblocks, msg_bytes);
